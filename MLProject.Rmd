@@ -1,0 +1,235 @@
+---
+title: "Practical Machine Learning - Course Project"
+output: html_document
+---
+
+###Background
+
+This project is prepared as a course project for Coursera Practical Machine Learning Course.
+
+The project introduction is as follow:
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+###Data 
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment. 
+
+###Expected Result 
+
+The gaol of the project is as follow:
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+
+###Reproducibility 
+
+To reproduce the project, please follow the following setps.
+
+        1. Create a project folder
+        2. Download the dataset from the links provided in the Data section
+        3. Transfer all the downloaded data into the cretaed folers
+        4. Set the project folder as the working directory using setwd() command
+        5. Load the necessary packages in the working directory
+        6. Load the data and run the codes as described below
+        
+### Methodology
+
+Since the project problem is a multi-class classification problem, 
+1. we will use random forest algrithm for training and predict the test data. If the result is not satisfactory we will use other alternative algrithm.
+2. We will use the Corss-validation methods using 5 Folds.
+
+
+###Loading Packages
+
+Load the necessary packages and set seed.
+```{r}
+library(caret)
+library(randomForest)
+set.seed(1234)
+```
+
+### Getting the Data
+After the training and testing data are transferred into the prodject folder, the data could be loaded into the global environment as follow:
+
+```{r}
+training <- read.csv("pml-training.csv",header=TRUE,na.strings=c("NA",""))
+testing <- read.csv("pml-testing.csv",header=TRUE,na.strings=c("NA",""))
+```
+
+###Checking, Cleaning and Removing Unnecessary Variables
+
+Check the rows and columns of training set.
+```{r}
+dim(training)
+dim(testing)
+```
+
+Check the column names.
+```{r}
+head(names(training),10)
+str(training[1:10])
+```
+
+Remove the uncecessary variables from the training data set. 
+```{r}
+trainClRM <- c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window")
+training <- training[,!names(training) %in% trainClRM]
+```
+
+
+###Preprocessing the **training** data.
+
+Check the near-zero variace variables and remove from the training set.
+```{r}
+nzv <- nearZeroVar(training,saveMetrics=TRUE)
+nzv[nzv$nzv, ][1:10, ]
+training <- training[,!nzv$nzv]
+dim(training)
+```
+
+
+Create a checking missing value utility function and use it to remove any variable which has missing value more than 90% of the data set. 
+```{r}
+NARemove <- function(data,cutoff){
+        NACount <- sapply(training,function (data) sum(is.na(data)))
+        NAProportion <- NACount/nrow(training)
+        RemovedNA <- NAProportion[NAProportion <= cutoff]
+        return (data[,names(RemovedNA)])
+}
+training <- NARemove(training,0.90)
+str(training[1:10])
+```
+
+
+Check the number of the NA value for each variables. 
+```{r}
+NACount <- sapply(training,function (training) sum(is.na(training)))
+NACount
+```
+
+Since there is no variable with NA values, we do not need to impute missing values.  
+
+Check the target variable if the classes are imblanced.
+```{r}
+round(table(training$classe)/nrow(training)*100,2)
+qplot(classe,data=training,,fill="classe",geom="bar",ylab="# Cases",xlab="Clases")
+```
+
+The multi-class target variable is fairly balanced, hence no action to be taken such as weighting. 
+
+Check the number of rows and columns after cleaning the data set. 
+```{r}
+dim(training)
+```
+There are now 52 predictors and 1 target variables. 
+
+### Data Partition 
+
+Split the training data into two: (1) a training data set and (2) validating data set
+```{r}
+inTrain <- createDataPartition(training$classe,p=0.60,list=FALSE)
+training <- training[inTrain,]
+validating <- training[-inTrain,]
+```
+
+
+###Modelling Using Random Forest
+
+Since the project problem is a multi-class classification problem, we will use random forest for modelling and look at the result. If the result is unsatisfactory, we will use other alternative methods.
+
+Set the training control parameters.
+1. Method: k-fold cross validation
+2. Number of Folds: 5
+```{r}
+set.seed(1234)
+trControl <- trainControl(method="cv",
+                          number=5)
+```
+
+Train the data using the control parameters. 
+```{r}
+rfFit <- train(classe ~.,data=training,
+               method="rf",
+               importance=TRUE,
+               trControl=trControl)
+
+```
+
+Check the result.
+```{r}
+rfFit
+```
+
+###Error of Estimate
+Since we are using the random forest, the error is estimated internally during the run.
+Hence we will look at the OOB as an out of sample error.
+```{r}
+rfFit$resample
+rfFit$result
+```
+
+Since the accurary result is more than 0.98, we estimate the OBB is less than 1%.
+```{r}
+rfFit$finalModel
+```
+
+###Model Validation
+Validate the result using the validation set.
+```{r}
+pred <- predict(rfFit,newdata=validating)
+confusionMatrix(pred,validating$classe)
+```
+The random forest algorithm products a good result with a high accurary at >0.9. Hence, we will not try another algorithm but will use this to predict for the testing data set. 
+
+###Applying the model to the Model test
+
+Prepare the testing data set.
+1. Select variables used in the training set.
+2. Make the class of testing data set same as the training set
+
+```{r}
+#Select variables used in training set
+testing <- testing[,names(testing) %in% names(training)]
+#Get the class of the training set.
+colClass <- sapply(training,function(x) class(x))
+#Making the class of testing set same as training set.
+for(i in 1:(ncol(training)-1)){
+        class(testing[,names(colClass[i])]) <- colClass[[i]]
+}
+```
+
+After the testing data set is cleaned and prepared, predict the testing data using the training fit.
+```{r}
+prediction <- predict(rfFit,newdata=testing)
+prediction
+```` 
+
+
+### Generating files for Submission.
+
+Use the following code chunk to produce the result for submission. 
+```{r}
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+
+pml_write_files(prediction)
+```
+
+As expected, all the submitted results are corret.

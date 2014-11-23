@@ -1,6 +1,6 @@
 PML-Course-Project
 ==================
-###Reading the HTML Report
+###Reading the compiled HTML Report
 2 Methods:-
  1. Go to  https://nlsume.github.io/
  2. To read the report, download the MLProject.html file into your local disk and open using any broswer.

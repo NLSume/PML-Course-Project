@@ -1,7 +1,7 @@
 PML-Course-Project
 ==================
 ###Reading the HTML Report
-Please download the MLProject.html file into your local disk and open using any broswer.
+To read the report, download the MLProject.html file into your local disk and open using any broswer.
 
 ###Background
 
